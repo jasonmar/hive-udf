@@ -1,0 +1,192 @@
+jasonmar@hive-demo-m:~$ hive
+SLF4J: Class path contains multiple SLF4J bindings.
+SLF4J: Found binding in [jar:file:/usr/lib/spark/jars/slf4j-log4j12-1.7.16.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: Found binding in [jar:file:/usr/lib/hadoop/lib/slf4j-log4j12-1.7.25.jar!/org/slf4j/impl/StaticLoggerBinder.class]
+SLF4J: See http://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J: Actual binding is of type [org.slf4j.impl.Log4jLoggerFactory]
+
+Logging initialized using configuration in file:/etc/hive/conf.dist/hive-log4j2.properties Async: true
+hive> SET hive.auto.convert.join=true;
+hive> SET hive.exec.dynamic.partition = true;
+hive> SET hive.exec.dynamic.partition.mode = nonstrict;
+hive> SET hive.exec.max.dynamic.partitions.pernode = 400;
+hive> SET hive.exec.parallel=true;
+hive>
+    > ADD JAR gs://hive-demo/udf.jar;
+Added [/tmp/d89032ea-b732-4a19-8a5a-7a58de7e9ee5_resources/udf.jar] to class path
+Added resources: [gs://hive-demo/udf.jar]
+hive> create database testdb;
+FAILED: Execution Error, return code 1 from org.apache.hadoop.hive.ql.exec.DDLTask. Database testdb already exists
+hive> use testdb;
+OK
+Time taken: 0.036 seconds
+hive> show tables;
+OK
+Time taken: 0.178 seconds
+hive> CREATE TABLE dual (x INT);
+OK
+Time taken: 0.392 seconds
+hive> INSERT INTO dual (x) VALUES(1);
+Query ID = jasonmar_20190225061553_b73cb246-baa0-4d99-a91f-641567f96123
+Total jobs = 1
+Launching Job 1 out of 1
+Status: Running (Executing on YARN cluster with App id application_1551074029414_0004)
+
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0
+----------------------------------------------------------------------------------------------
+VERTICES: 01/01  [==========================>>] 100%  ELAPSED TIME: 4.71 s
+----------------------------------------------------------------------------------------------
+Loading data to table testdb.dual
+OK
+Time taken: 10.322 seconds
+hive>
+    > CREATE TEMPORARY FUNCTION to_json AS 'com.google.cloud.example.hive.udf.HiveOutputToJsonUDF';
+OK
+Time taken: 0.03 seconds
+hive>
+    > CREATE TABLE struct_table (
+    >   address STRUCT<
+    >     nbr: INT
+    >     ,street: STRING
+    >     ,city: STRING
+    >     ,state: STRING
+    >     ,postal: INT
+    >   >
+    > )
+    > PARTITIONED BY (data_date STRING)
+    > STORED AS ORC;
+OK
+Time taken: 0.112 seconds
+hive>
+    > CREATE TABLE json_table (
+    >   address STRING
+    > )
+    > PARTITIONED BY (data_date STRING)
+    > STORED AS ORC;
+OK
+Time taken: 0.068 seconds
+hive>
+    > SHOW TABLES;
+OK
+dual
+json_table
+struct_table
+values__tmp__table__1
+Time taken: 0.034 seconds, Fetched: 4 row(s)
+hive>
+    > INSERT INTO TABLE struct_table
+    > PARTITION (data_date)
+    > SELECT
+    >   NAMED_STRUCT(
+    >     'nbr',111,
+    >     'street','8th Ave',
+    >     'city','New York',
+    >     'state','NY',
+    >     'postal',10011
+    >   ) AS address
+    >   ,'2019-02-25' as data_date
+    > FROM dual
+    > LIMIT 1;
+Query ID = jasonmar_20190225061604_189e2296-e70f-4e48-8095-916b13c0cc16
+Total jobs = 1
+Launching Job 1 out of 1
+Status: Running (Executing on YARN cluster with App id application_1551074029414_0004)
+
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0
+Reducer 2 ...... container     SUCCEEDED      1          1        0        0       0       0
+----------------------------------------------------------------------------------------------
+VERTICES: 02/02  [==========================>>] 100%  ELAPSED TIME: 0.77 s
+----------------------------------------------------------------------------------------------
+Loading data to table testdb.struct_table partition (data_date=null)
+
+Loaded : 1/1 partitions.
+	 Time taken to load dynamic partitions: 0.132 seconds
+	 Time taken for adding to write entity : 0.0 seconds
+OK
+Time taken: 2.897 seconds
+hive>
+    > SELECT * FROM struct_table;
+OK
+{"nbr":111,"street":"8th Ave","city":"New York","state":"NY","postal":10011}	2019-02-25
+Time taken: 0.221 seconds, Fetched: 1 row(s)
+hive>
+    > INSERT INTO TABLE json_table
+    > PARTITION (data_date)
+    > SELECT
+    >   '{}' AS address
+    >   ,'2019-02-25' as data_date
+    > FROM dual
+    > LIMIT 1;
+Query ID = jasonmar_20190225061607_bd158b13-d84d-4c65-9268-92c3e396d648
+Total jobs = 1
+Launching Job 1 out of 1
+Status: Running (Executing on YARN cluster with App id application_1551074029414_0004)
+
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0
+Reducer 2 ...... container     SUCCEEDED      1          1        0        0       0       0
+----------------------------------------------------------------------------------------------
+VERTICES: 02/02  [==========================>>] 100%  ELAPSED TIME: 0.34 s
+----------------------------------------------------------------------------------------------
+Loading data to table testdb.json_table partition (data_date=null)
+
+Loaded : 1/1 partitions.
+	 Time taken to load dynamic partitions: 0.1 seconds
+	 Time taken for adding to write entity : 0.0 seconds
+OK
+Time taken: 2.462 seconds
+hive>
+    > SELECT * FROM json_table;
+OK
+{}	2019-02-25
+Time taken: 0.154 seconds, Fetched: 1 row(s)
+hive>
+    > INSERT OVERWRITE TABLE json_table
+    > PARTITION (data_date)
+    > SELECT
+    >   to_json(address) as address
+    >   ,data_date
+    > FROM struct_table
+    > LIMIT 1;
+Query ID = jasonmar_20190225061610_cec84820-3709-4343-811b-5ceb48023306
+Total jobs = 1
+Launching Job 1 out of 1
+Status: Running (Executing on YARN cluster with App id application_1551074029414_0004)
+
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+        VERTICES      MODE        STATUS  TOTAL  COMPLETED  RUNNING  PENDING  FAILED  KILLED
+----------------------------------------------------------------------------------------------
+Map 1 .......... container     SUCCEEDED      1          1        0        0       0       0
+Reducer 2 ...... container     SUCCEEDED      1          1        0        0       0       0
+----------------------------------------------------------------------------------------------
+VERTICES: 02/02  [==========================>>] 100%  ELAPSED TIME: 0.51 s
+----------------------------------------------------------------------------------------------
+Loading data to table testdb.json_table partition (data_date=null)
+
+Loaded : 1/1 partitions.
+	 Time taken to load dynamic partitions: 0.117 seconds
+	 Time taken for adding to write entity : 0.0 seconds
+OK
+Time taken: 2.475 seconds
+hive>
+    > SELECT * FROM json_table;
+OK
+{"nbr":111,"street":"8th Ave","city":"New York","state":"NY","postal":10011}	2019-02-25
+Time taken: 0.157 seconds, Fetched: 1 row(s)
